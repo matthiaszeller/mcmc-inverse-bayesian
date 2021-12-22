@@ -38,9 +38,9 @@ def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, N: int, verbos
         else:
             X.append(X[-1].copy())
 
+    p_accept = accepted / (N-1)
     if verbose:
-        p_accept = accepted / (N-1)
-        print(f'took {f"{time() - start:.2} s":<8} acceptance rate {p_accept:.3}')
+        print(f'took {f"{time() - start:.3} s":<8} acceptance rate {p_accept:.3}')
 
-    return np.array(X)
+    return np.array(X), p_accept
 

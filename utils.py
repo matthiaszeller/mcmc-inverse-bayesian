@@ -1,4 +1,6 @@
-
+import gzip
+import json
+from copy import deepcopy
 
 import numpy as np
 
@@ -76,6 +78,33 @@ def target_density(theta: np.ndarray, sigma_noise: float, y_data: np.ndarray) ->
     log_prior = - 0.5 * ( (theta * np.arange(1, theta.size+1))**2 ).sum()
     # Return posterior density
     return np.exp(log_likelihood + log_prior)
+
+
+#%%
+
+def dump_simulation_results(data, fpath):
+    """Store simulation results, formatted as a list of dictionnaries.
+    Each dictionnary has at least the entry `X`, an NxD array representing a Markov Chain,
+    and additional fields that are useful for analysis"""
+    # Make arrays json-serialization
+    data = deepcopy(data)
+    for dic in data:
+        dic['X'] = dic['X'].tolist()
+    # Dump in file
+    with gzip.open(fpath, 'w') as f:
+        json_data = json.dumps(data)
+        f.write(json_data.encode('utf8'))
+
+
+def load_simulation_results(fpath):
+    """Load the data dumped by the `dump_simulation_results` function."""
+    with gzip.open(fpath, 'r') as f:
+        data = json.loads(f.read().decode())
+    # Convert to numpy arrays
+    for dic in data:
+        dic['X'] = np.array(dic['X'])
+
+    return data
 
 
 #%%
