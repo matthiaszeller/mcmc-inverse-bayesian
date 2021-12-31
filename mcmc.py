@@ -12,8 +12,7 @@ import statsmodels.graphics.tsaplots as sm
 from scipy import signal
 
 
-def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray,
-         N: int, precond_const: float = 1.0, verbose: bool = True):
+def pcn(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, factor: float, N: int, verbose: bool = True):
     """
     Random Walk Metropolis Hastings, i.e. type of Markov Chain Monte Carlo in continuous state space with Gaussian proposal
     density centered at current state.
@@ -23,7 +22,6 @@ def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray,
     :param variances: 1D array of variances for each component of the proposal distribution
     :param X0: starting point of the chain
     :param N: chain length
-    :param precond_const: constant for preconditionned Crank-Nicholson, e.g. sqrt(1 - s^2)
     :return: Markov Chain of length N
     """
     start = time()
@@ -32,18 +30,66 @@ def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray,
     Us = np.random.random(N-1)
     # Generate the proposal samples (centered at zero) in advance, much more efficient -> shift them later
     Ys = np.random.multivariate_normal(np.zeros_like(X0), np.diag(variances), size=N-1)
+    # Initialize loop
     accepted = 0
+    ftilde_previous = ftilde(X[-1])
     for U, Y in zip(Us, Ys):
         # Proposal sample properly shifted so that the Gaussian is centered around the current state
-        Y += X[-1] * precond_const
+        Y += X[-1] * factor
         # Compute acceptance probability
-        alpha = min(1., ftilde(Y) / ftilde(X[-1]))
+        ftilde_proposal = ftilde(Y)
+        alpha = min(1., ftilde_proposal / ftilde_previous)
         # Accept or reject
         if U < alpha:
             X.append(Y)
             accepted += 1
+            ftilde_previous = ftilde_proposal
         else:
             X.append(X[-1].copy())
+            # No need to update ftilde_previous
+
+    p_accept = accepted / (N-1)
+    if verbose:
+        print(f'took {f"{time() - start:.3} s":<8} acceptance rate {p_accept:.3}')
+
+    return np.array(X), p_accept
+
+
+def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, N: int, verbose: bool = True):
+    """
+    Random Walk Metropolis Hastings, i.e. type of Markov Chain Monte Carlo in continuous state space with Gaussian proposal
+    density centered at current state.
+    For a multidimensional state space, the components of the proposal samples are independent, i.e. the covariance
+    matrix is diagonal.
+    :param ftilde: un-normalized target density being the Markov Chain invariant distribution (after normalization)
+    :param variances: 1D array of variances for each component of the proposal distribution
+    :param X0: starting point of the chain
+    :param N: chain length
+    :return: Markov Chain of length N
+    """
+    start = time()
+    X = [X0.copy()]
+    # Generate uniform variables used for acceptance/rejection
+    Us = np.random.random(N-1)
+    # Generate the proposal samples (centered at zero) in advance, much more efficient -> shift them later
+    Ys = np.random.multivariate_normal(np.zeros_like(X0), np.diag(variances), size=N-1)
+    # Initialize loop
+    accepted = 0
+    ftilde_previous = ftilde(X[-1])
+    for U, Y in zip(Us, Ys):
+        # Proposal sample properly shifted so that the Gaussian is centered around the current state
+        Y += X[-1]
+        # Compute acceptance probability
+        ftilde_proposal = ftilde(Y)
+        alpha = min(1., ftilde_proposal / ftilde_previous)
+        # Accept or reject
+        if U < alpha:
+            X.append(Y)
+            accepted += 1
+            ftilde_previous = ftilde_proposal
+        else:
+            X.append(X[-1].copy())
+            # No need to update ftilde_previous
 
     p_accept = accepted / (N-1)
     if verbose:
