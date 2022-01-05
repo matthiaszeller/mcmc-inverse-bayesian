@@ -14,10 +14,7 @@ from scipy import signal
 
 def pcn(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, factor: float, N: int, verbose: bool = True):
     """
-    Random Walk Metropolis Hastings, i.e. type of Markov Chain Monte Carlo in continuous state space with Gaussian proposal
-    density centered at current state.
-    For a multidimensional state space, the components of the proposal samples are independent, i.e. the covariance
-    matrix is diagonal.
+    Preconditionned Cranck-Nicolson.
     :param ftilde: un-normalized target density being the Markov Chain invariant distribution (after normalization)
     :param variances: 1D array of variances for each component of the proposal distribution
     :param X0: starting point of the chain
@@ -112,7 +109,7 @@ def diagnose_plot(chains: Iterable[np.ndarray], descriptions: Iterable[str], lab
     _, axes = plt.subplots(len(chains), 3, figsize=(15, len(chains) * 3.5 + .5), sharex='col', sharey='col')
     for ax, chain, desc in zip(axes, chains, descriptions):
         ax[0].hist(chain, density=True, bins=40)
-        sm.plot_acf(chain, ax=ax[1], lags=int(len(chain)/5))
+        sm.plot_acf(chain, ax=ax[1], lags=int(len(chain)-1))
         ax[2].plot(chain)
         ax[0].set_ylabel(desc)
 

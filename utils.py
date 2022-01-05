@@ -41,6 +41,8 @@ def G(theta: np.ndarray) -> np.ndarray:
     Observation operator, returns the pressure (solution of PDE) evaluated at position x = [0.2, 0.4, 0.6, 0.8]
     The closed-form solution of the pressure is an integral, approximated by discretization with
     a number of intervals twice as big as the dimension of theta.
+    Note that this function adapts to any size of the vector theta.
+
     :param theta: Fourier coefficients, 1D array
     :return: 1D array of length 4, pressure evaluated at positions [0.2, 0.4, 0.6, 0.8]
     """
