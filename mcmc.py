@@ -10,34 +10,35 @@ from statsmodels.tsa.stattools import acf
 
 
 #%%
-from scipy import signal
 
 
-def indep_sampler(ftilde: Callable, proposal_density: Callable, proposal_sampler: Callable,
-                  X0: np.ndarray, N: int, verbose: bool = True):
+def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, N: int, verbose: bool = True):
     """
-    MCMC independent sampling.
-    :param ftilde: target distribution
-    :param proposal_density: function taking 1 input and returning density of the proposal
-    :param proposal_sampler: function taking 1 input (number of samples) and returns N iid samples from proposal
-    :param X0: starting point
+    Random Walk Metropolis Hastings, i.e. type of Markov Chain Monte Carlo in continuous state space with Gaussian proposal
+    density centered at current state.
+    For a multidimensional state space, the components of the proposal samples are independent, i.e. the covariance
+    matrix is diagonal.
+    :param ftilde: un-normalized target density being the Markov Chain invariant distribution (after normalization)
+    :param variances: 1D array of variances for each component of the proposal distribution
+    :param X0: starting point of the chain
     :param N: chain length
-    :param verbose: whether to print debugging informations
-    :return:
+    :return: Markov Chain of length N
     """
     start = time()
     X = [X0.copy()]
     # Generate uniform variables used for acceptance/rejection
     Us = np.random.random(N-1)
-    # Generate the proposal samples
-    Ys = proposal_sampler(N-1)
+    # Generate the proposal samples (centered at zero) in advance, much more efficient -> shift them later
+    Ys = np.random.multivariate_normal(np.zeros_like(X0), np.diag(variances), size=N-1)
     # Initialize loop
     accepted = 0
     ftilde_previous = ftilde(X[-1])
     for U, Y in zip(Us, Ys):
+        # Proposal sample properly shifted so that the Gaussian is centered around the current state
+        Y += X[-1]
         # Compute acceptance probability
         ftilde_proposal = ftilde(Y)
-        alpha = min(1., ftilde_proposal / ftilde_previous * proposal_density(X[-1]) / proposal_density(Y))
+        alpha = min(1., ftilde_proposal / ftilde_previous)
         # Accept or reject
         if U < alpha:
             X.append(Y)
@@ -57,10 +58,7 @@ def indep_sampler(ftilde: Callable, proposal_density: Callable, proposal_sampler
 
 def pcn(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, factor: float, N: int, verbose: bool = True):
     """
-    Random Walk Metropolis Hastings, i.e. type of Markov Chain Monte Carlo in continuous state space with Gaussian proposal
-    density centered at current state.
-    For a multidimensional state space, the components of the proposal samples are independent, i.e. the covariance
-    matrix is diagonal.
+    Preconditionned Cranck-Nicolson.
     :param ftilde: un-normalized target density being the Markov Chain invariant distribution (after normalization)
     :param variances: 1D array of variances for each component of the proposal distribution
     :param X0: starting point of the chain
@@ -98,33 +96,31 @@ def pcn(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, factor: float, 
     return np.array(X), p_accept
 
 
-def rwmh(ftilde: Callable, variances: np.ndarray, X0: np.ndarray, N: int, verbose: bool = True):
+def indep_sampler(ftilde: Callable, proposal_density: Callable, proposal_sampler: Callable,
+                  X0: np.ndarray, N: int, verbose: bool = True):
     """
-    Random Walk Metropolis Hastings, i.e. type of Markov Chain Monte Carlo in continuous state space with Gaussian proposal
-    density centered at current state.
-    For a multidimensional state space, the components of the proposal samples are independent, i.e. the covariance
-    matrix is diagonal.
-    :param ftilde: un-normalized target density being the Markov Chain invariant distribution (after normalization)
-    :param variances: 1D array of variances for each component of the proposal distribution
-    :param X0: starting point of the chain
+    MCMC independent sampling.
+    :param ftilde: target distribution
+    :param proposal_density: function taking 1 input and returning density of the proposal
+    :param proposal_sampler: function taking 1 input (number of samples) and returns N iid samples from proposal
+    :param X0: starting point
     :param N: chain length
-    :return: Markov Chain of length N
+    :param verbose: whether to print debugging informations
+    :return:
     """
     start = time()
     X = [X0.copy()]
     # Generate uniform variables used for acceptance/rejection
     Us = np.random.random(N-1)
-    # Generate the proposal samples (centered at zero) in advance, much more efficient -> shift them later
-    Ys = np.random.multivariate_normal(np.zeros_like(X0), np.diag(variances), size=N-1)
+    # Generate the proposal samples
+    Ys = proposal_sampler(N-1)
     # Initialize loop
     accepted = 0
     ftilde_previous = ftilde(X[-1])
     for U, Y in zip(Us, Ys):
-        # Proposal sample properly shifted so that the Gaussian is centered around the current state
-        Y += X[-1]
         # Compute acceptance probability
         ftilde_proposal = ftilde(Y)
-        alpha = min(1., ftilde_proposal / ftilde_previous)
+        alpha = min(1., ftilde_proposal / ftilde_previous * proposal_density(X[-1]) / proposal_density(Y))
         # Accept or reject
         if U < alpha:
             X.append(Y)
